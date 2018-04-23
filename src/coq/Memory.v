@@ -23,6 +23,10 @@ Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 Export SS.DV.
 
+(* For the memory model's byte representation *)
+Module CompByte := Integers.Make(Wordsize_8).
+Definition int8 := CompByte.int.
+
 Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
 Definition IntMap := IM.t.
 
@@ -63,7 +67,7 @@ Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
 (* TODO: replace Coq byte with CompCert's int8 *)
 
 Inductive SByte :=
-| Byte : byte -> SByte
+| Byte : int8 -> SByte
 | Ptr : addr -> SByte
 | PtrFrag : SByte
 | SUndef : SByte.
@@ -82,32 +86,32 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
-(* Should be Int8.repr or something like it. *)
-
-Definition byte_of (_ _ _ _ _ _ _ _:Z) : byte := Byte.zero.
-
 Fixpoint one_bits_to_bytes (l:list Z) : list SByte :=
   match l with
-  | b0::b1::b2::b3::b4::b5::b6::b7::r =>
-    let bs := one_bits_to_bytes r in
-    (Byte (byte_of b0 b1 b2 b3 b4 b5 b6 b7))::bs
-  | r => []
+  | b0::b1::b2::b3::b4::b5::b6::b7::tl =>
+    let bs := one_bits_to_bytes tl in
+    (Byte (CompByte.repr (CompByte.powerserie [b0;b1;b2;b3;b4;b5;b6;b7])))::bs
+  | _ => []
   end.
 
 (* Convert integer to its SByte representation. *)
 Definition Z_to_sbyte_list (z:Z) : list SByte :=
-  one_bits_to_bytes (Int64.Z_one_bits 64 z 8).
+  one_bits_to_bytes (Int64.Z_one_bits 64 z 0).
 
 Fixpoint bytes_to_one_bits (l:list SByte) : list Z :=
   match l with
   | (Byte b)::tl =>
-    Int64.Z_one_bits 8 (Byte.unsigned b) 0 ++ bytes_to_one_bits tl 
+    Int64.Z_one_bits 64 (CompByte.unsigned b) 0 ++ bytes_to_one_bits tl
   | _ => [] (* error *)
   end.
 
 (* Converts SBytes into their integer representation. *)
 Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
   Int64.powerserie (bytes_to_one_bits bytes).
+
+Compute (Int64.powerserie (Int64.Z_one_bits 64 255 0)).
+Compute (Z_to_sbyte_list 255).
+Compute sbyte_list_to_Z (Z_to_sbyte_list 256).
 
 (* Serializes a dvalue into its SByte-sensitive form. *)
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
