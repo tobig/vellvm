@@ -84,42 +84,36 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
 
 Definition byte_of (_ _ _ _ _ _ _ _:Z) : byte := Byte.zero.
 
-Fixpoint one_bits_to_bytes (l:list Z) : (list byte) * list Z :=
+Fixpoint one_bits_to_bytes (l:list Z) : list SByte :=
   match l with
   | b0::b1::b2::b3::b4::b5::b6::b7::r =>
-    let '(bs, zs) := one_bits_to_bytes r in
-    ( (byte_of b0 b1 b2 b3 b4 b5 b6 b7)::bs , zs)
-  | r => ([], r)
+    let bs := one_bits_to_bytes r in
+    (Byte (byte_of b0 b1 b2 b3 b4 b5 b6 b7))::bs
+  | r => []
   end.
 
-Definition Z_to_sbyte_list wordsize (z:Z) : option (list SByte) :=
-  let (bs, r) := one_bits_to_bytes (Integers.Z_one_bits wordsize z 0) in
-  if r == [] then Some bs else None.
-
 (* Convert integer to its SByte representation. *)
-Fixpoint Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
-  match count with
-  | O => []
-  | S n => (Z_to_sbyte_list n (z / 256)) ++ [Byte (Byte.repr (z mod 256))]
+Definition Z_to_sbyte_list (z:Z) : list SByte :=
+  one_bits_to_bytes (Int64.Z_one_bits 64 z 8).
+
+Fixpoint bytes_to_one_bits (l:list SByte) : list Z :=
+  match l with
+  | (Byte b)::tl =>
+    Int64.Z_one_bits 8 (Byte.unsigned b) 0 ++ bytes_to_one_bits tl 
+  | _ => [] (* error *)
   end.
 
 (* Converts SBytes into their integer representation. *)
 Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
-  fst (fold_right (fun x acc =>
-               match x with
-               | Byte b =>
-                 let shift := snd acc in
-                 ((fst acc) + ((Byte.intval b) * shift), shift * 256)
-               | _ => acc (* should not have other kinds bytes in an int *)
-               end) (0, 1) bytes).
+  Int64.powerserie (bytes_to_one_bits bytes).
 
 (* Serializes a dvalue into its SByte-sensitive form. *)
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   match dval with
   | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
-  | DVALUE_I1 i => Z_to_sbyte_list 8 (Int1.unsigned i)
-  | DVALUE_I32 i => Z_to_sbyte_list 8 (Int32.unsigned i)
-  | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
+  | DVALUE_I1 i => Z_to_sbyte_list (Int1.unsigned i)
+  | DVALUE_I32 i => Z_to_sbyte_list (Int32.unsigned i)
+  | DVALUE_I64 i => Z_to_sbyte_list (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
       (* note the _right_ fold is necessary for byte ordering. *)
       fold_right (fun '(typ, dv) acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
