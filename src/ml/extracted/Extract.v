@@ -1,5 +1,6 @@
 Require Vellvm.TopLevel.
 Require Vellvm.Transform.
+Require Vellvm.MulAdd.
 
 
 Require ExtrOcamlBasic.
@@ -45,3 +46,4 @@ Cd "ml/extracted".
 Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.
+Extraction Library MulAdd.

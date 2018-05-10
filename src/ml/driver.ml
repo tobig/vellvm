@@ -12,13 +12,14 @@ open Printf
 open Platform
 open Llvm
 open Ast    
+open MulAdd
 
 let of_str = Camlcoq.camlstring_of_coqstring
                
 let interpret = ref false
 
 let transform (prog : (LLVMAst.block list) LLVMAst.toplevel_entity list) : (LLVMAst.block list) LLVMAst.toplevel_entity list =
-  Transform.transform prog
+  MulAdd.transform prog
   
 let print_banner s =
   let rec dashes n = if n = 0 then "" else "-"^(dashes (n-1)) in
